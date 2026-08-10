@@ -114,9 +114,9 @@ def download_yesterday_report():
         
         output_xlsx_path = os.path.join(UPLOAD_FOLDER, "Summary_Yesterday_Report.xlsx")
         
-        now = datetime.now()
-        yesterday_start = datetime(now.year, now.month, now.day) - timedelta(days=1)
-        yesterday_end = datetime(now.year, now.month, now.day)
+        # Получаем вчерашнюю дату в строковом формате 'YYYY-MM-DD'
+        yesterday_str = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        print(f"Ищем звонки за вчера: {yesterday_str}")
         
         with pd.ExcelWriter(output_xlsx_path, engine='openpyxl') as writer:
             summary_list = []
@@ -141,11 +141,16 @@ def download_yesterday_report():
                             break
                     
                     if date_col:
-                        df['ParsedDate'] = pd.to_datetime(df[date_col], errors='coerce')
-                        filtered_df = df[(df['ParsedDate'] >= yesterday_start) & (df['ParsedDate'] < yesterday_end)]
+                        # Берем первые 10 символов строки (YYYY-MM-DD) для точного сравнения
+                        df['DateStr'] = df[date_col].astype(str).str.slice(0, 10)
+                        filtered_df = df[df['DateStr'] == yesterday_str]
+                        
                         if not filtered_df.empty:
                             df = filtered_df
-                        df = df.drop(columns=['ParsedDate'], errors='ignore')
+                        else:
+                            df = df.iloc[0:0]  # Пустой датафрейм, если за вчера нет данных
+                        
+                        df = df.drop(columns=['DateStr'], errors='ignore')
 
                     if df.empty:
                         continue
@@ -169,6 +174,9 @@ def download_yesterday_report():
                 except Exception as e:
                     print(f"Ошибка внутри цикла для файла {file_path}: {e}")
 
+            if not summary_list:
+                return jsonify({"status": "error", "message": f"За вчерашний день ({yesterday_str}) звонков не найдено!"}), 404
+
             if summary_list:
                 summary_df = pd.DataFrame(summary_list)
                 summary_df.to_excel(writer, sheet_name='Сводка за вчера', index=False)
@@ -190,9 +198,6 @@ def download_yesterday_report():
                         break
 
                 all_details_df.to_excel(writer, sheet_name='Детализация за вчера', index=False)
-
-        if not summary_list:
-            return jsonify({"status": "error", "message": "За вчерашний день звонков не найдено!"}), 404
 
         return send_file(
             output_xlsx_path, 
