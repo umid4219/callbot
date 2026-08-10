@@ -3,50 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Панель сбора данных</title>
+    <title>Отчеты по звонкам</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #0f172a;
-            color: #f8fafc;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
+            background-color: #f4f7f6;
             margin: 0;
+            padding: 50px;
+            text-align: center;
         }
         .container {
-            background-color: #1e293b;
-            padding: 30px;
+            background: white;
+            padding: 40px;
             border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            text-align: center;
-            width: 400px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: inline-block;
+            max-width: 500px;
+            width: 100%;
         }
         h1 {
-            font-size: 22px;
-            margin-bottom: 25px;
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 20px;
         }
-        a.btn {
+        p {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .btn {
             display: block;
-            background-color: #3b82f6;
+            width: 100%;
+            padding: 14px 0;
+            margin: 15px 0;
+            background-color: #007bff;
             color: white;
             text-decoration: none;
-            padding: 14px;
             font-size: 16px;
+            font-weight: bold;
             border-radius: 8px;
-            transition: background 0.2s;
+            transition: background 0.3s ease;
+            box-sizing: border-box;
         }
-        a.btn:hover {
-            background-color: #2563eb;
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .btn-yesterday {
+            background-color: #28a745;
+        }
+        .btn-yesterday:hover {
+            background-color: #218838;
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>Панель сбора данных</h1>
-        <a href="/api/download-report" class="btn">Скачать сводный отчет (Excel)</a>
+        <h1>Панель отчетов по звонкам</h1>
+        <p>Скачайте сводный Excel-отчет по всем зарегистрированным сотрудникам.</p>
+        
+        <a href="/api/download-report" class="btn">Скачать отчет за сегодня</a>
+        <a href="/api/download-yesterday-report" class="btn btn-yesterday">Скачать отчет за вчера</a>
     </div>
 
 </body>
