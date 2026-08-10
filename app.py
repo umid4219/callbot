@@ -93,8 +93,10 @@ def download_report():
                 except:
                     return seconds
 
-            if 'Длительность (сек)' in all_details_df.columns:
-                all_details_df['Длительность (сек)'] = all_details_df['Длительность (сек)'].apply(format_duration)
+            for col_name in ['Длительность (сек)', 'Duration', 'duration']:
+                if col_name in all_details_df.columns:
+                    all_details_df[col_name] = all_details_df[col_name].apply(format_duration)
+                    break
 
             all_details_df.to_excel(writer, sheet_name='Детализация звонков', index=False)
 
@@ -174,10 +176,6 @@ def download_yesterday_report():
             summary_df.to_excel(writer, sheet_name='Сводка за вчера', index=False)
 
         if not all_details_df.empty:
-            cols = ['Сотрудник', 'Номер телефона', 'Тип вызова', 'Дата и время', 'Длительность (сек)']
-            if len(all_details_df.columns) >= len(cols):
-                all_details_df.columns = list(all_details_df.columns[:len(cols)-5]) + cols[1:]
-            
             def format_duration(seconds):
                 try:
                     sec = int(float(seconds))
@@ -188,8 +186,10 @@ def download_yesterday_report():
                 except:
                     return seconds
 
-            if 'Длительность (сек)' in all_details_df.columns:
-                all_details_df['Длительность (сек)'] = all_details_df['Длительность (сек)'].apply(format_duration)
+            for col_name in ['Длительность (сек)', 'Duration', 'duration']:
+                if col_name in all_details_df.columns:
+                    all_details_df[col_name] = all_details_df[col_name].apply(format_duration)
+                    break
 
             all_details_df.to_excel(writer, sheet_name='Детализация за вчера', index=False)
 
