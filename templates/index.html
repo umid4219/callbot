@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель управления звонками</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: #1e293b;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 400px;
+        }
+        h1 {
+            font-size: 22px;
+            margin-bottom: 20px;
+        }
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        button {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #2563eb;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #334155;
+            border-radius: 6px;
+            font-size: 14px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Панель сбора данных</h1>
+        <div class="btn-group">
+            <button onclick="sendAction('day')">Собрать за весь день</button>
+            <button onclick="sendAction('hour')">Собрать за последний час</button>
+        </div>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function sendAction(actionType) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerText = 'Запрос отправлен... Ждем выгрузку.';
+
+            fetch('/api/collect', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ action: actionType })
+            })
+            .then(response => response.json())
+            .then(data => {
+                resultDiv.innerText = data.message;
+            })
+            .catch(error => {
+                resultDiv.innerText = 'Ошибка соединения с сервером.';
+                console.error('Error:', error);
+            });
+        }
+    </script>
+
+</body>
+</html>
