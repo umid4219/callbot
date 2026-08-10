@@ -41,7 +41,7 @@ def download_report():
         
         output_xlsx_path = os.path.join(UPLOAD_FOLDER, "Summary_Call_Report.xlsx")
         
-        # Устанавливаем интервал за последние 48 часов
+        # Интервал за последние 48 часов
         now = datetime.now()
         start_time = now - timedelta(hours=48)
         print(f"Ищем звонки за последние 48 часов (начиная с {start_time})")
@@ -69,7 +69,6 @@ def download_report():
                 
                 if date_col:
                     df['ParsedDate'] = pd.to_datetime(df[date_col], errors='coerce')
-                    # Фильтруем данные строго за последние 48 часов
                     filtered_df = df[(df['ParsedDate'] >= start_time) & (df['ParsedDate'] <= now)]
                     if not filtered_df.empty:
                         df = filtered_df
