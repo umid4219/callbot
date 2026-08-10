@@ -1,5 +1,7 @@
 import os
 import glob
+import traceback
+from datetime import datetime, timedelta
 import pandas as pd
 from flask import Flask, render_template, request, send_file, jsonify
 
@@ -30,15 +32,20 @@ def upload_report():
 
 @app.route('/api/download-report', methods=['GET', 'POST'])
 def download_report():
-    all_files = glob.glob(os.path.join(UPLOAD_FOLDER, "Call_Report_*.csv"))
-    csv_files = [f for f in all_files if f.endswith('.csv')]
-    
-    if not csv_files:
-        return jsonify({"status": "error", "message": "Ни один телефон еще не передал данные!"}), 404
-    
-    output_xlsx_path = os.path.join(UPLOAD_FOLDER, "Summary_Call_Report.xlsx")
-    
-    with pd.ExcelWriter(output_xlsx_path, engine='openpyxl') as writer:
+    try:
+        all_files = glob.glob(os.path.join(UPLOAD_FOLDER, "Call_Report_*.csv"))
+        csv_files = [f for f in all_files if f.endswith('.csv')]
+        
+        if not csv_files:
+            return jsonify({"status": "error", "message": "Ни один телефон еще не передал данные!"}), 404
+        
+        output_xlsx_path = os.path.join(UPLOAD_FOLDER, "Summary_Call_Report.xlsx")
+        
+        # Устанавливаем интервал за последние 48 часов
+        now = datetime.now()
+        start_time = now - timedelta(hours=48)
+        print(f"Ищем звонки за последние 48 часов (начиная с {start_time})")
+        
         summary_list = []
         all_details_df = pd.DataFrame()
 
@@ -54,6 +61,23 @@ def download_report():
                 if len(df.columns) == 1:
                     df = pd.read_csv(file_path, sep=None, engine='python')
                 
+                date_col = None
+                for col in ['Дата и время', 'Date', 'date', 'time']:
+                    if col in df.columns:
+                        date_col = col
+                        break
+                
+                if date_col:
+                    df['ParsedDate'] = pd.to_datetime(df[date_col], errors='coerce')
+                    # Фильтруем данные строго за последние 48 часов
+                    filtered_df = df[(df['ParsedDate'] >= start_time) & (df['ParsedDate'] <= now)]
+                    if not filtered_df.empty:
+                        df = filtered_df
+                    df = df.drop(columns=['ParsedDate'], errors='ignore')
+
+                if df.empty:
+                    continue
+
                 df.insert(0, 'Сотрудник', employee_name)
                 
                 total_calls = len(df)
@@ -73,13 +97,13 @@ def download_report():
             except Exception as e:
                 print(f"Ошибка чтения файла {file_path}: {e}")
 
-        if not summary_list:
-            return jsonify({"status": "error", "message": "Нет данных для формирования отчета!"}), 404
+        if all_details_df.empty or not summary_list:
+            return jsonify({"status": "error", "message": "За последние 48 часов звонков не найдено!"}), 404
 
-        summary_df = pd.DataFrame(summary_list)
-        summary_df.to_excel(writer, sheet_name='Сводка', index=False)
+        with pd.ExcelWriter(output_xlsx_path, engine='openpyxl') as writer:
+            summary_df = pd.DataFrame(summary_list)
+            summary_df.to_excel(writer, sheet_name='Сводка за 48 часов', index=False)
 
-        if not all_details_df.empty:
             def format_duration(seconds):
                 try:
                     sec = int(float(seconds))
@@ -95,13 +119,17 @@ def download_report():
                     all_details_df[col_name] = all_details_df[col_name].apply(format_duration)
                     break
 
-            all_details_df.to_excel(writer, sheet_name='Детализация звонков', index=False)
+            all_details_df.to_excel(writer, sheet_name='Детализация за 48 часов', index=False)
 
-    return send_file(
-        output_xlsx_path, 
-        as_attachment=True, 
-        download_name="Summary_Call_Report.xlsx"
-    )
+        return send_file(
+            output_xlsx_path, 
+            as_attachment=True, 
+            download_name="Summary_48Hours_Report.xlsx"
+        )
+    except Exception as e:
+        print("КРИТИЧЕСКАЯ ОШИБКА В /api/download-report:")
+        traceback.print_exc()
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
