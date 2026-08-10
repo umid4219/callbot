@@ -21,15 +21,14 @@ def upload_report():
     if file.filename == '':
         return jsonify({"status": "error", "message": "Имя файла пустое"}), 400
     
-    filename = secure_filename_custom(file.filename)
+    filename = "".join(c for c in file.filename if c.isalnum() or c in ('_', '.', '-')).strip()
     filepath = os.path.join(UPLOAD_FOLDER, filename)
-    
     file.save(filepath)
     print(f"Успешно сохранен отчет: {filename}")
     
     return jsonify({"status": "success", "message": "Отчет успешно загружен!"})
 
-@app.route('/api/download-report', methods=['POST'])
+@app.route('/api/download-report', methods=['GET', 'POST'])
 def download_report():
     search_path = os.path.join(UPLOAD_FOLDER, "Call_Report_*.csv")
     csv_files = glob.glob(search_path)
@@ -89,9 +88,6 @@ def download_report():
         as_attachment=True, 
         download_name="Summary_Call_Report.xlsx"
     )
-
-def secure_filename_custom(filename):
-    return "".join(c for c in filename if c.isalnum() or c in ('_', '.', '-')).strip()
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
