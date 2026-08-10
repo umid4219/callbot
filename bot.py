@@ -1,8 +1,8 @@
 import os
-import threading
+from threading import Thread
 from flask import Flask
 
-# 1. Веб-сервер для удержания порта Render
+# 1. Веб-сервер для открытия порта на Render
 app = Flask("")
 
 
@@ -11,15 +11,14 @@ def home():
     return "Bot is running!"
 
 
-def run():
+def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
 
-t = threading.Thread(target=run)
-t.start()
+Thread(target=run_web).daemon = True
 
-# 2. Основной код бота
+# 2. Основной код телеграм-бота
 import openpyxl
 import pandas as pd
 import telebot
