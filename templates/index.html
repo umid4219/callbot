@@ -60,8 +60,8 @@
     <div class="container">
         <h1>Панель сбора данных</h1>
         <div class="btn-group">
-            <button onclick="downloadReport('day')">Собрать за весь день</button>
-            <button onclick="downloadReport('hour')">Собрать за последний час</button>
+            <button onclick="downloadReport('day')">Скачать отчет за день (CSV)</button>
+            <button onclick="downloadReport('hour')">Скачать отчет за час (CSV)</button>
         </div>
         <div id="status">Генерация отчета...</div>
     </div>
@@ -71,8 +71,8 @@
             const statusDiv = document.getElementById('status');
             statusDiv.style.display = 'block';
             statusDiv.innerText = actionType === 'day' 
-                ? 'Сбор данных за весь день...' 
-                : 'Сбор данных за последний час...';
+                ? 'Запрос отчета за весь день...' 
+                : 'Запрос отчета за последний час...';
 
             fetch('/api/download-report', {
                 method: 'POST',
@@ -82,21 +82,21 @@
                 body: JSON.stringify({ action: actionType })
             })
             .then(response => {
-                if (!response.ok) throw new Error('Ошибка при скачивании');
+                if (!response.ok) throw new Error('Телефон еще не передал данные!');
                 return response.blob();
             })
             .then(blob => {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `Call_Report_${actionType}.xlsx`;
+                a.download = `Call_Report_${actionType}.csv`;
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
                 statusDiv.innerText = 'Отчет успешно скачан!';
             })
             .catch(error => {
-                statusDiv.innerText = 'Произошла ошибка при выгрузке.';
+                statusDiv.innerText = 'Ошибка: телефон еще не отправил данные.';
                 console.error(error);
             });
         }
