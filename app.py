@@ -1,5 +1,7 @@
 import os
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, send_file
+import pandas as pd
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -7,26 +9,32 @@ app = Flask(__name__)
 def index():
     return render_template('index.html')
 
-@app.route('/api/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return jsonify({"status": "error", "message": "Файл не найден в запросе"})
+@app.route('/api/download-report', methods=['POST'])
+def download_report():
+    data = request.get_json() or {}
+    action = data.get('action', 'day') # 'day' или 'hour'
     
-    file = request.files['file']
-    action = request.form.get('action') # 'day' или 'hour'
+    # --- ЗДЕСЬ БУДЕТ ЛОГИКА ПОЛУЧЕНИЯ ДАННЫХ С ТЕЛЕФОНА ---
+    # Пока формируем тестовый отчет по звонкам сотрудников на основе запроса
     
-    if file.filename == '':
-        return jsonify({"status": "error", "message": "Файл не выбран"})
+    # Имитация данных, полученных с телефона
+    call_data = [
+        {"Сотрудник": "Алексей Иванов", "Количество звонков": 45, "Время разговоров (мин)": 120, "Период": action},
+        {"Сотрудник": "Марина Смирнова", "Количество звонков": 38, "Время разговоров (мин)": 95, "Период": action},
+        {"Сотрудник": "Дмитрий Петров", "Количество звонков": 52, "Время разговоров (мин)": 150, "Период": action},
+    ]
     
-    if file:
-        # Здесь можно сохранить файл или сразу прочитать его через pandas / openpyxl
-        filename = file.filename
-        
-        # --- ТВОЯ ЛОГИКА ОБРАБОТКИ EXCEL ---
-        # Пример: файл получен, дальше можно вытаскивать ФИО и ПИНФЛ
-        
-        message = f"Файл '{filename}' успешно получен для режима '{action}'! Данные обработаны."
-        return jsonify({"status": "success", "message": message})
+    df = pd.DataFrame(call_data)
+    
+    # Имя файла с текущей датой
+    filename = f"Call_Report_{action}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.xlsx"
+    filepath = os.path.join('/tmp', filename)
+    
+    # Сохраняем в Excel с красивым оформлением через pandas/openpyxl
+    df.to_excel(filepath, index=False)
+    
+    # Отправляем файл пользователю на скачивание
+    return send_file(filepath, as_attachment=True, download_name=filename)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
