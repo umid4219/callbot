@@ -32,8 +32,8 @@ def upload_report():
 
 @app.route('/api/download-report', methods=['GET', 'POST'])
 def download_report():
-    search_path = os.path.join(UPLOAD_FOLDER, "Call_Report_*.csv")
-    csv_files = glob.glob(search_path)
+    all_files = glob.glob(os.path.join(UPLOAD_FOLDER, "Call_Report_*.csv"))
+    csv_files = [f for f in all_files if f.endswith('.csv')]
     
     if not csv_files:
         return jsonify({"status": "error", "message": "Ни один телефон еще не передал данные!"}), 404
@@ -106,8 +106,8 @@ def download_report():
 @app.route('/api/download-yesterday-report', methods=['GET', 'POST'])
 def download_yesterday_report():
     try:
-        search_path = os.path.join(UPLOAD_FOLDER, "Call_Report_*.csv")
-        csv_files = glob.glob(search_path)
+        all_files = glob.glob(os.path.join(UPLOAD_FOLDER, "Call_Report_*.csv"))
+        csv_files = [f for f in all_files if f.endswith('.csv')]
         
         if not csv_files:
             return jsonify({"status": "error", "message": "Ни один телефон еще не передал данные!"}), 404
