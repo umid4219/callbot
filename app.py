@@ -81,6 +81,21 @@ def download_report():
             cols = ['Сотрудник', 'Номер телефона', 'Тип вызова', 'Дата и время', 'Длительность (сек)']
             if len(all_details_df.columns) == len(cols):
                 all_details_df.columns = cols
+            
+            # Функция для красивого форматирования секунд в минуты и секунды
+            def format_duration(seconds):
+                try:
+                    sec = int(float(seconds))
+                    m, s = divmod(sec, 60)
+                    if m > 0:
+                        return f"{m} мин {s} сек"
+                    return f"{s} сек"
+                except:
+                    return seconds
+
+            if 'Длительность (сек)' in all_details_df.columns:
+                all_details_df['Длительность (сек)'] = all_details_df['Длительность (сек)'].apply(format_duration)
+
             all_details_df.to_excel(writer, sheet_name='Детализация звонков', index=False)
 
     return send_file(
