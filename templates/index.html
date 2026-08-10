@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Панель управления Excel</title>
+    <title>Панель сбора данных</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -21,37 +21,23 @@
             border-radius: 12px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
             text-align: center;
-            width: 420px;
+            width: 400px;
         }
         h1 {
             font-size: 22px;
-            margin-bottom: 20px;
-        }
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            align-items: stretch;
-        }
-        input[type="file"] {
-            background-color: #334155;
-            color: #f8fafc;
-            padding: 10px;
-            border-radius: 6px;
-            border: 1px solid #475569;
-            cursor: pointer;
+            margin-bottom: 25px;
         }
         .btn-group {
             display: flex;
-            gap: 10px;
+            flex-direction: column;
+            gap: 15px;
         }
         button {
-            flex: 1;
             background-color: #3b82f6;
             color: white;
             border: none;
-            padding: 12px;
-            font-size: 14px;
+            padding: 14px;
+            font-size: 16px;
             border-radius: 8px;
             cursor: pointer;
             transition: background 0.2s;
@@ -59,60 +45,59 @@
         button:hover {
             background-color: #2563eb;
         }
-        #result {
+        #status {
             margin-top: 20px;
             padding: 10px;
             background-color: #334155;
             border-radius: 6px;
             font-size: 14px;
             display: none;
-            word-break: break-all;
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>Загрузка Excel</h1>
-        <div class="form-group">
-            <input type="file" id="excelFile" accept=".xlsx, .xls">
-            <div class="btn-group">
-                <button onclick="sendData('day')">За весь день</button>
-                <button onclick="sendData('hour')">За час</button>
-            </div>
+        <h1>Панель сбора данных</h1>
+        <div class="btn-group">
+            <button onclick="downloadReport('day')">Собрать за весь день</button>
+            <button onclick="downloadReport('hour')">Собрать за последний час</button>
         </div>
-        <div id="result"></div>
+        <div id="status">Генерация отчета...</div>
     </div>
 
     <script>
-        function sendData(actionType) {
-            const fileInput = document.getElementById('excelFile');
-            const resultDiv = document.getElementById('result');
+        function downloadReport(actionType) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.style.display = 'block';
+            statusDiv.innerText = actionType === 'day' 
+                ? 'Сбор данных за весь день...' 
+                : 'Сбор данных за последний час...';
 
-            if (fileInput.files.length === 0) {
-                resultDiv.style.display = 'block';
-                resultDiv.innerText = 'Пожалуйста, выберите Excel-файл!';
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
-            formData.append('action', actionType);
-
-            resultDiv.style.display = 'block';
-            resultDiv.innerText = 'Отправка и обработка файла...';
-
-            fetch('/api/upload', {
+            fetch('/api/download-report', {
                 method: 'POST',
-                body: formData
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ action: actionType })
             })
-            .then(response => response.json())
-            .then(data => {
-                resultDiv.innerText = data.message;
+            .then(response => {
+                if (!response.ok) throw new Error('Ошибка при скачивании');
+                return response.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Call_Report_${actionType}.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                statusDiv.innerText = 'Всё успешно выгружено и сохранено!';
             })
             .catch(error => {
-                resultDiv.innerText = 'Ошибка соединения с сервером.';
-                console.error('Error:', error);
+                statusDiv.innerText = 'Произошла ошибка при выгрузке.';
+                console.error(error);
             });
         }
     </script>
