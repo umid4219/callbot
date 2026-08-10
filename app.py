@@ -116,8 +116,10 @@ def download_yesterday_report():
         
         output_xlsx_path = os.path.join(UPLOAD_FOLDER, "Summary_Yesterday_Report.xlsx")
         
-        yesterday_str = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
-        print(f"Ищем звонки за вчера: {yesterday_str}")
+        # Берем интервал за последние 48 часов (вместо 24)
+        now = datetime.now()
+        start_time = now - timedelta(hours=48)
+        print(f"Ищем звонки за последние 48 часов (начиная с {start_time})")
         
         summary_list = []
         all_details_df = pd.DataFrame()
@@ -141,15 +143,12 @@ def download_yesterday_report():
                         break
                 
                 if date_col:
-                    df['DateStr'] = df[date_col].astype(str).str.slice(0, 10)
-                    filtered_df = df[df['DateStr'] == yesterday_str]
-                    
+                    df['ParsedDate'] = pd.to_datetime(df[date_col], errors='coerce')
+                    # Фильтруем всё, что было за последние 48 часов
+                    filtered_df = df[(df['ParsedDate'] >= start_time) & (df['ParsedDate'] <= now)]
                     if not filtered_df.empty:
                         df = filtered_df
-                    else:
-                        df = df.iloc[0:0]
-                    
-                    df = df.drop(columns=['DateStr'], errors='ignore')
+                    df = df.drop(columns=['ParsedDate'], errors='ignore')
 
                 if df.empty:
                     continue
@@ -173,36 +172,34 @@ def download_yesterday_report():
             except Exception as e:
                 print(f"Ошибка внутри цикла для файла {file_path}: {e}")
 
-        # Проверка перед созданием Excel, чтобы избежать ошибки пустых листов
-        if not summary_list:
-            return jsonify({"status": "error", "message": f"За вчерашний день ({yesterday_str}) звонков не найдено!"}), 404
+        if all_details_df.empty or not summary_list:
+            return jsonify({"status": "error", "message": "За последние 48 часов звонков не найдено!"}), 404
 
         with pd.ExcelWriter(output_xlsx_path, engine='openpyxl') as writer:
             summary_df = pd.DataFrame(summary_list)
-            summary_df.to_excel(writer, sheet_name='Сводка за вчера', index=False)
+            summary_df.to_excel(writer, sheet_name='Звонки за 48 часов', index=False)
 
-            if not all_details_df.empty:
-                def format_duration(seconds):
-                    try:
-                        sec = int(float(seconds))
-                        m, s = divmod(sec, 60)
-                        if m > 0:
-                            return f"{m} мин {s} сек"
-                        return f"{s} сек"
-                    except:
-                        return seconds
+            def format_duration(seconds):
+                try:
+                    sec = int(float(seconds))
+                    m, s = divmod(sec, 60)
+                    if m > 0:
+                        return f"{m} мин {s} сек"
+                    return f"{s} сек"
+                except:
+                    return seconds
 
-                for col_name in ['Длительность (сек)', 'Duration', 'duration']:
-                    if col_name in all_details_df.columns:
-                        all_details_df[col_name] = all_details_df[col_name].apply(format_duration)
-                        break
+            for col_name in ['Длительность (сек)', 'Duration', 'duration']:
+                if col_name in all_details_df.columns:
+                    all_details_df[col_name] = all_details_df[col_name].apply(format_duration)
+                    break
 
-                all_details_df.to_excel(writer, sheet_name='Детализация за вчера', index=False)
+            all_details_df.to_excel(writer, sheet_name='Детализация за 48 часов', index=False)
 
         return send_file(
             output_xlsx_path, 
             as_attachment=True, 
-            download_name="Summary_Yesterday_Report.xlsx"
+            download_name="Summary_48Hours_Report.xlsx"
         )
     except Exception as e:
         print("КРИТИЧЕСКАЯ ОШИБКА В /api/download-yesterday-report:")
