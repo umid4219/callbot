@@ -1,39 +1,48 @@
 import os
-from flask import Flask, render_template, request, send_file
-import pandas as pd
-from datetime import datetime
+from flask import Flask, render_template, request, send_file, jsonify
 
 app = Flask(__name__)
+
+# Папка для хранения актуальных отчетов от телефона
+UPLOAD_FOLDER = '/tmp'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
+# Эндпоинт, куда андроид-приложение отправляет готовый Excel-файл
+@app.route('/api/upload-report', methods=['POST'])
+def upload_report():
+    if 'file' not in request.files:
+        return jsonify({"status": "error", "message": "Файл не найден"}), 400
+    
+    file = request.files['file']
+    action = request.form.get('action', 'day') # 'day' или 'hour'
+    
+    if file.filename == '':
+        return jsonify({"status": "error", "message": "Имя файла пустое"}), 400
+    
+    # Сохраняем под конкретный тип отчета
+    filename = f"Call_Report_{action}.xlsx"
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(filepath)
+    
+    return jsonify({"status": "success", "message": "Отчет успешно загружен с телефона!"})
+
+# Эндпоинт, который скачивает отчет по нажатию кнопки на сайте
 @app.route('/api/download-report', methods=['POST'])
 def download_report():
     data = request.get_json() or {}
-    action = data.get('action', 'day') # 'day' или 'hour'
+    action = data.get('action', 'day')
     
-    # --- ЗДЕСЬ БУДЕТ ЛОГИКА ПОЛУЧЕНИЯ ДАННЫХ С ТЕЛЕФОНА ---
-    # Пока формируем тестовый отчет по звонкам сотрудников на основе запроса
+    filename = f"Call_Report_{action}.xlsx"
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
     
-    # Имитация данных, полученных с телефона
-    call_data = [
-        {"Сотрудник": "Алексей Иванов", "Количество звонков": 45, "Время разговоров (мин)": 120, "Период": action},
-        {"Сотрудник": "Марина Смирнова", "Количество звонков": 38, "Время разговоров (мин)": 95, "Период": action},
-        {"Сотрудник": "Дмитрий Петров", "Количество звонков": 52, "Время разговоров (мин)": 150, "Период": action},
-    ]
-    
-    df = pd.DataFrame(call_data)
-    
-    # Имя файла с текущей датой
-    filename = f"Call_Report_{action}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.xlsx"
-    filepath = os.path.join('/tmp', filename)
-    
-    # Сохраняем в Excel с красивым оформлением через pandas/openpyxl
-    df.to_excel(filepath, index=False)
-    
-    # Отправляем файл пользователю на скачивание
+    # Если телефон еще не прислал файл
+    if not os.path.exists(filepath):
+        return jsonify({"status": "error", "message": "Телефон еще не передал данные!"}), 404
+        
     return send_file(filepath, as_attachment=True, download_name=filename)
 
 if __name__ == '__main__':
