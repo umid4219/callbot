@@ -1,55 +1,27 @@
 import os
-from threading import Thread
-from flask import Flask
+from flask import Flask, render_template, request, jsonify
 
-# 1. Веб-сервер для открытия порта на Render
-app = Flask("")
+app = Flask(__name__)
 
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-@app.route("/")
-def home():
-    return "Bot is running!"
+@app.route('/api/collect', methods=['POST'])
+def collect_data():
+    data = request.json
+    action = data.get('action')
+    
+    # Здесь можно прописать логику сбора данных (например, обращение к телефонам или базе)
+    if action == 'day':
+        message = "Выполнен сбор данных за весь день. Всё успешно выгружено!"
+    elif action == 'hour':
+        message = "Выполнен сбор данных за последний час. Всё успешно выгружено!"
+    else:
+        message = "Неизвестное действие."
+        
+    return jsonify({"status": "success", "message": message})
 
-
-def run_web():
+if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
-
-
-Thread(target=run_web).daemon = True
-
-# 2. Основной код телеграм-бота
-import openpyxl
-import pandas as pd
-import telebot
-from telebot import types
-
-TOKEN = "8800194423:AAG3Fo11dgB9HCbktMHkg1eLlkLA27oovhk"
-bot = telebot.TeleBot(TOKEN)
-
-
-@bot.message_handler(commands=["start"])
-def send_welcome(message):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    btn1 = types.KeyboardButton("Собрать за весь день")
-    btn2 = types.KeyboardButton("Собрать за последний час")
-    markup.add(btn1, btn2)
-    bot.send_message(
-        message.chat.id,
-        "Привет! Выберите действие с помощью кнопок ниже:",
-        reply_markup=markup,
-    )
-
-
-@bot.message_handler(
-    func=lambda message: message.text
-    in ["Собрать за весь день", "Собрать за последний час"]
-)
-def handle_actions(message):
-    bot.send_message(
-        message.chat.id, "Запрос отправлен всем телефонам... Ждем выгрузку."
-    )
-
-
-if __name__ == "__main__":
-    bot.infinity_polling()
+    app.run(host='0.0.0.0', port=port)
