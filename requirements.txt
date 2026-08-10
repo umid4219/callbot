@@ -1,4 +1,1 @@
-pyTelegramBotAPI
-pandas
-openpyxl
 flask
