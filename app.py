@@ -1,4 +1,6 @@
 import os
+import glob
+import pandas as pd
 from flask import Flask, render_template, request, send_file, jsonify
 
 app = Flask(__name__)
@@ -16,32 +18,83 @@ def upload_report():
         return jsonify({"status": "error", "message": "Файл не найден"}), 400
     
     file = request.files['file']
-    action = request.form.get('action', 'day')
-    
     if file.filename == '':
         return jsonify({"status": "error", "message": "Имя файла пустое"}), 400
     
-    filename = f"Call_Report_{action}.csv"
+    # Сохраняем индивидуальный файл отчета (например, Call_Report_Алексей.csv)
+    filename = secure_filename_custom(file.filename)
     filepath = os.path.join(UPLOAD_FOLDER, filename)
     
-    # Сохраняем файл, который прислал телефон
     file.save(filepath)
-    print(f"Успешно сохранен файл: {filepath}")
+    print(f"Успешно сохранен отчет: {filename}")
     
-    return jsonify({"status": "success", "message": "Отчет успешно загружен с телефона!"})
+    return jsonify({"status": "success", "message": "Отчет успешно загружен!"})
 
 @app.route('/api/download-report', methods=['POST'])
 def download_report():
-    data = request.get_json() or {}
-    action = data.get('action', 'day')
+    # Ищем абсолютно все файлы отчетов от телефонов в папке /tmp
+    search_path = os.path.join(UPLOAD_FOLDER, "Call_Report_*.csv")
+    csv_files = glob.glob(search_path)
     
-    filename = f"Call_Report_{action}.csv"
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    if not csv_files:
+        return jsonify({"status": "error", "message": "Ни один телефон еще не передал данные!"}), 404
     
-    if not os.path.exists(filepath):
-        return jsonify({"status": "error", "message": "Телефон еще не передал данные!"}), 404
-        
-    return send_file(filepath, as_attachment=True, download_name=filename)
+    output_xlsx_path = os.path.join(UPLOAD_FOLDER, "Summary_Call_Report.xlsx")
+    
+    # Создаем красивый многостраничный Excel файл
+    with pd.ExcelWriter(output_xlsx_path, engine='openpyxl') as writer:
+        summary_list = []
+        all_details_df = pd.DataFrame()
+
+        for file_path in csv_files:
+            base_name = os.path.basename(file_path)
+            # Достаем имя сотрудника из названия файла
+            employee_name = base_name.replace("Call_Report_", "").replace(".csv", "").replace("_", " ")
+            
+            try:
+                df = pd.read_csv(file_path)
+                if df.empty:
+                    continue
+                
+                # Вставляем колонку с именем сотрудника на первое место
+                df.insert(0, 'Сотрудник', employee_name)
+                
+                # Считаем статистику для сводной таблицы
+                total_calls = len(df)
+                incoming = len(df[df['Type'] == 'Входящий'])
+                outgoing = len(df[df['Type'] == 'Исходящий'])
+                missed = len(df[df['Type'] == 'Пропущенный'])
+                
+                summary_list.append({
+                    'Сотрудник': employee_name,
+                    'Всего звонков': total_calls,
+                    'Входящие': incoming,
+                    'Исходящие': outgoing,
+                    'Пропущенные': missed
+                })
+                
+                all_details_df = pd.concat([all_details_df, df], ignore_index=True)
+            except Exception as e:
+                print(f"Ошибка чтения файла {file_path}: {e}")
+
+        # 1. Лист со сводкой по сотрудникам
+        if summary_list:
+            summary_df = pd.DataFrame(summary_list)
+            summary_df.to_excel(writer, sheet_name='Сводка', index=False)
+
+        # 2. Лист с подробным списком всех звонков
+        if not all_details_df.empty:
+            all_details_df.columns = ['Сотрудник', 'Номер телефона', 'Тип вызова', 'Дата и время', 'Длительность (сек)']
+            all_details_df.to_excel(writer, sheet_name='Детализация звонков', index=False)
+
+    return send_file(
+        output_xlsx_path, 
+        as_attachment=True, 
+        download_name="Summary_Call_Report.xlsx"
+    )
+
+def secure_filename_custom(filename):
+    return "".join(c for c in filename if c.isalnum() or c in ('_', '.', '-')).strip()
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
