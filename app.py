@@ -75,9 +75,11 @@ def download_report():
             except Exception as e:
                 print(f"Ошибка чтения файла {file_path}: {e}")
 
-        if summary_list:
-            summary_df = pd.DataFrame(summary_list)
-            summary_df.to_excel(writer, sheet_name='Сводка', index=False)
+        if not summary_list:
+            return jsonify({"status": "error", "message": "Нет данных для формирования отчета!"}), 404
+
+        summary_df = pd.DataFrame(summary_list)
+        summary_df.to_excel(writer, sheet_name='Сводка', index=False)
 
         if not all_details_df.empty:
             def format_duration(seconds):
@@ -114,72 +116,70 @@ def download_yesterday_report():
         
         output_xlsx_path = os.path.join(UPLOAD_FOLDER, "Summary_Yesterday_Report.xlsx")
         
-        # Получаем вчерашнюю дату в строковом формате 'YYYY-MM-DD'
         yesterday_str = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
         print(f"Ищем звонки за вчера: {yesterday_str}")
         
-        with pd.ExcelWriter(output_xlsx_path, engine='openpyxl') as writer:
-            summary_list = []
-            all_details_df = pd.DataFrame()
+        summary_list = []
+        all_details_df = pd.DataFrame()
 
-            for file_path in csv_files:
-                base_name = os.path.basename(file_path)
-                employee_name = base_name.replace("Call_Report_", "").replace(".csv", "").replace("_", " ")
+        for file_path in csv_files:
+            base_name = os.path.basename(file_path)
+            employee_name = base_name.replace("Call_Report_", "").replace(".csv", "").replace("_", " ")
+            
+            try:
+                df = pd.read_csv(file_path, sep=',')
+                if df.empty:
+                    continue
                 
-                try:
-                    df = pd.read_csv(file_path, sep=',')
-                    if df.empty:
-                        continue
+                if len(df.columns) == 1:
+                    df = pd.read_csv(file_path, sep=None, engine='python')
+                
+                date_col = None
+                for col in ['Дата и время', 'Date', 'date', 'time']:
+                    if col in df.columns:
+                        date_col = col
+                        break
+                
+                if date_col:
+                    df['DateStr'] = df[date_col].astype(str).str.slice(0, 10)
+                    filtered_df = df[df['DateStr'] == yesterday_str]
                     
-                    if len(df.columns) == 1:
-                        df = pd.read_csv(file_path, sep=None, engine='python')
+                    if not filtered_df.empty:
+                        df = filtered_df
+                    else:
+                        df = df.iloc[0:0]
                     
-                    date_col = None
-                    for col in ['Дата и время', 'Date', 'date', 'time']:
-                        if col in df.columns:
-                            date_col = col
-                            break
-                    
-                    if date_col:
-                        # Берем первые 10 символов строки (YYYY-MM-DD) для точного сравнения
-                        df['DateStr'] = df[date_col].astype(str).str.slice(0, 10)
-                        filtered_df = df[df['DateStr'] == yesterday_str]
-                        
-                        if not filtered_df.empty:
-                            df = filtered_df
-                        else:
-                            df = df.iloc[0:0]  # Пустой датафрейм, если за вчера нет данных
-                        
-                        df = df.drop(columns=['DateStr'], errors='ignore')
+                    df = df.drop(columns=['DateStr'], errors='ignore')
 
-                    if df.empty:
-                        continue
+                if df.empty:
+                    continue
 
-                    df.insert(0, 'Сотрудник', employee_name)
-                    
-                    total_calls = len(df)
-                    incoming = len(df[df['Type'].astype(str).str.contains('Входящий|Incoming', case=False, na=False)])
-                    outgoing = len(df[df['Type'].astype(str).str.contains('Исходящий|Outgoing', case=False, na=False)])
-                    missed = len(df[df['Type'].astype(str).str.contains('Пропущенный|Missed', case=False, na=False)])
-                    
-                    summary_list.append({
-                        'Сотрудник': employee_name,
-                        'Всего звонков': total_calls,
-                        'Входящие': incoming,
-                        'Исходящие': outgoing,
-                        'Пропущенные': missed
-                    })
-                    
-                    all_details_df = pd.concat([all_details_df, df], ignore_index=True)
-                except Exception as e:
-                    print(f"Ошибка внутри цикла для файла {file_path}: {e}")
+                df.insert(0, 'Сотрудник', employee_name)
+                
+                total_calls = len(df)
+                incoming = len(df[df['Type'].astype(str).str.contains('Входящий|Incoming', case=False, na=False)])
+                outgoing = len(df[df['Type'].astype(str).str.contains('Исходящий|Outgoing', case=False, na=False)])
+                missed = len(df[df['Type'].astype(str).str.contains('Пропущенный|Missed', case=False, na=False)])
+                
+                summary_list.append({
+                    'Сотрудник': employee_name,
+                    'Всего звонков': total_calls,
+                    'Входящие': incoming,
+                    'Исходящие': outgoing,
+                    'Пропущенные': missed
+                })
+                
+                all_details_df = pd.concat([all_details_df, df], ignore_index=True)
+            except Exception as e:
+                print(f"Ошибка внутри цикла для файла {file_path}: {e}")
 
-            if not summary_list:
-                return jsonify({"status": "error", "message": f"За вчерашний день ({yesterday_str}) звонков не найдено!"}), 404
+        # Проверка перед созданием Excel, чтобы избежать ошибки пустых листов
+        if not summary_list:
+            return jsonify({"status": "error", "message": f"За вчерашний день ({yesterday_str}) звонков не найдено!"}), 404
 
-            if summary_list:
-                summary_df = pd.DataFrame(summary_list)
-                summary_df.to_excel(writer, sheet_name='Сводка за вчера', index=False)
+        with pd.ExcelWriter(output_xlsx_path, engine='openpyxl') as writer:
+            summary_df = pd.DataFrame(summary_list)
+            summary_df.to_excel(writer, sheet_name='Сводка за вчера', index=False)
 
             if not all_details_df.empty:
                 def format_duration(seconds):
