@@ -1,7 +1,7 @@
 import os
 import glob
 import traceback
-from datetime import datetime, timedelta
+from datetime import datetime
 import pandas as pd
 from flask import Flask, render_template, request, send_file, jsonify
 
@@ -26,7 +26,7 @@ def upload_report():
     filename = "".join(c for c in file.filename if c.isalnum() or c in ('_', '.', '-')).strip()
     filepath = os.path.join(UPLOAD_FOLDER, filename)
     file.save(filepath)
-    print(f"Успешно сохранен отчет: {filename}")
+    print(f"-> Успешно сохранен/обновлен файл отчета: {filename}")
     
     return jsonify({"status": "success", "message": "Отчет успешно загружен!"})
 
@@ -36,15 +36,14 @@ def download_report():
         all_files = glob.glob(os.path.join(UPLOAD_FOLDER, "Call_Report_*.csv"))
         csv_files = [f for f in all_files if f.endswith('.csv')]
         
+        print(f"-> Найдено CSV файлов на сервере: {len(csv_files)}")
+        for f in csv_files:
+            print(f"   - {f}")
+
         if not csv_files:
             return jsonify({"status": "error", "message": "Ни один телефон еще не передал данные!"}), 404
         
         output_xlsx_path = os.path.join(UPLOAD_FOLDER, "Summary_Call_Report.xlsx")
-        
-        # Получаем сегодняшнюю и вчерашнюю дату в виде строк 'YYYY-MM-DD'
-        today_str = datetime.now().strftime('%Y-%m-%d')
-        yesterday_str = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
-        print(f"Ищем звонки за {yesterday_str} и {today_str}")
         
         summary_list = []
         all_details_df = pd.DataFrame()
@@ -54,61 +53,53 @@ def download_report():
             employee_name = base_name.replace("Call_Report_", "").replace(".csv", "").replace("_", " ")
             
             try:
-                df = pd.read_csv(file_path, sep=',')
+                # Читаем файл со всеми колонками как текст
+                df = pd.read_csv(file_path, sep=',', dtype=str)
                 if df.empty:
+                    print(f"   Файл пуст: {base_name}")
                     continue
                 
                 if len(df.columns) == 1:
-                    df = pd.read_csv(file_path, sep=None, engine='python')
-                
-                date_col = None
-                for col in ['Date', 'date', 'Дата и время', 'time']:
-                    if col in df.columns:
-                        date_col = col
-                        break
-                
-                if date_col:
-                    # Превращаем колонку в текст и берем первые 10 символов (формат YYYY-MM-DD)
-                    df['DateStr'] = df[date_col].astype(str).str.strip().str.slice(0, 10)
-                    
-                    # Оставляем только те строки, где дата равна сегодня ИЛИ вчера
-                    filtered_df = df[(df['DateStr'] == today_str) | (df['DateStr'] == yesterday_str)]
-                    
-                    if not filtered_df.empty:
-                        df = filtered_df
-                    else:
-                        df = df.iloc[0:0]
-                        
-                    df = df.drop(columns=['DateStr'], errors='ignore')
+                    df = pd.read_csv(file_path, sep=None, engine='python', dtype=str)
 
-                if df.empty:
-                    continue
+                print(f"   Прочитано строк из {base_name}: {len(df)}")
+
+                # Чистка номеров телефонов от .0
+                for col in ['Number', 'number', 'Номер']:
+                    if col in df.columns:
+                        df[col] = df[col].astype(str).apply(lambda x: x[:-2] if str(x).endswith('.0') else x)
 
                 df.insert(0, 'Сотрудник', employee_name)
                 
-                total_calls = len(df)
-                incoming = len(df[df['Type'].astype(str).str.contains('Входящий|Incoming', case=False, na=False)])
-                outgoing = len(df[df['Type'].astype(str).str.contains('Исходящий|Outgoing', case=False, na=False)])
-                missed = len(df[df['Type'].astype(str).str.contains('Пропущенный|Missed', case=False, na=False)])
+                # Подсчет типов звонков
+                df['CleanType'] = df['Type'].astype(str).str.lower().str.strip()
                 
-                summary_list.append({
+                total_calls = len(df)
+                incoming = len(df[df['CleanType'].str.contains('вход|incoming', na=False)])
+                outgoing = len(df[df['CleanType'].str.contains('исход|outgoing', na=False)])
+                missed = len(df[df['CleanType'].str.contains('пропущ|missed', na=False)])
+                
+                df = df.drop(columns=['CleanType'], errors='ignore')
+                
+                summary_List_item = {
                     'Сотрудник': employee_name,
                     'Всего звонков': total_calls,
                     'Входящие': incoming,
                     'Исходящие': outgoing,
                     'Пропущенные': missed
-                })
+                }
+                summary_list.append(summary_List_item)
                 
                 all_details_df = pd.concat([all_details_df, df], ignore_index=True)
             except Exception as e:
                 print(f"Ошибка чтения файла {file_path}: {e}")
 
         if all_details_df.empty or not summary_list:
-            return jsonify({"status": "error", "message": "За последние 48 часов звонков не найдено!"}), 404
+            return jsonify({"status": "error", "message": "В файлах не найдено данных о звонках!"}), 404
 
         with pd.ExcelWriter(output_xlsx_path, engine='openpyxl') as writer:
             summary_df = pd.DataFrame(summary_list)
-            summary_df.to_excel(writer, sheet_name='Сводка за 48 часов', index=False)
+            summary_df.to_excel(writer, sheet_name='Сводка', index=False)
 
             def format_duration(seconds):
                 try:
@@ -125,12 +116,12 @@ def download_report():
                     all_details_df[col_name] = all_details_df[col_name].apply(format_duration)
                     break
 
-            all_details_df.to_excel(writer, sheet_name='Детализация за 48 часов', index=False)
+            all_details_df.to_excel(writer, sheet_name='Детализация', index=False)
 
         return send_file(
             output_xlsx_path, 
             as_attachment=True, 
-            download_name="Summary_48Hours_Report.xlsx"
+            download_name="Summary_Call_Report.xlsx"
         )
     except Exception as e:
         print("КРИТИЧЕСКАЯ ОШИБКА В /api/download-report:")
