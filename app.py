@@ -134,14 +134,18 @@ def download_yesterday_report():
                 if len(df.columns) == 1:
                     df = pd.read_csv(file_path, sep=None, engine='python')
                 
-                if 'Дата и время' in df.columns:
-                    df['ParsedDate'] = pd.to_datetime(df['Дата и время'], errors='coerce')
-                    df = df[(df['ParsedDate'] >= yesterday_start) & (df['ParsedDate'] < yesterday_end)]
-                    df = df.drop(columns=['ParsedDate'])
-                elif 'Date' in df.columns:
-                    df['ParsedDate'] = pd.to_datetime(df['Date'], errors='coerce')
-                    df = df[(df['ParsedDate'] >= yesterday_start) & (df['ParsedDate'] < yesterday_end)]
-                    df = df.drop(columns=['ParsedDate'])
+                date_col = None
+                for col in ['Дата и время', 'Date', 'date', 'time']:
+                    if col in df.columns:
+                        date_col = col
+                        break
+                
+                if date_col:
+                    df['ParsedDate'] = pd.to_datetime(df[date_col], errors='coerce')
+                    filtered_df = df[(df['ParsedDate'] >= yesterday_start) & (df['ParsedDate'] < yesterday_end)]
+                    if not filtered_df.empty:
+                        df = filtered_df
+                    df = df.drop(columns=['ParsedDate'], errors='ignore')
 
                 if df.empty:
                     continue
@@ -163,7 +167,7 @@ def download_yesterday_report():
                 
                 all_details_df = pd.concat([all_details_df, df], ignore_index=True)
             except Exception as e:
-                print(f"Ошибка чтения вчерашнего файла {file_path}: {e}")
+                print(f"Ошибка обработки файла вчерашнего отчета {file_path}: {e}")
 
         if summary_list:
             summary_df = pd.DataFrame(summary_list)
@@ -171,8 +175,8 @@ def download_yesterday_report():
 
         if not all_details_df.empty:
             cols = ['Сотрудник', 'Номер телефона', 'Тип вызова', 'Дата и время', 'Длительность (сек)']
-            if len(all_details_df.columns) == len(cols):
-                all_details_df.columns = cols
+            if len(all_details_df.columns) >= len(cols):
+                all_details_df.columns = list(all_details_df.columns[:len(cols)-5]) + cols[1:]
             
             def format_duration(seconds):
                 try:
@@ -190,7 +194,7 @@ def download_yesterday_report():
             all_details_df.to_excel(writer, sheet_name='Детализация за вчера', index=False)
 
     if not summary_list:
-        return jsonify({"status": "error", "message": "За вчерашний день звонков не найдено!"}), 404
+        return jsonify({"status": "error", "message": "За вчерашний день звонков не найдено или они не соответствуют формату даты!"}), 404
 
     return send_file(
         output_xlsx_path, 
