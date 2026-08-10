@@ -27,31 +27,18 @@
             font-size: 22px;
             margin-bottom: 25px;
         }
-        .btn-group {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-        button {
+        a.btn {
+            display: block;
             background-color: #3b82f6;
             color: white;
-            border: none;
+            text-decoration: none;
             padding: 14px;
             font-size: 16px;
             border-radius: 8px;
-            cursor: pointer;
             transition: background 0.2s;
         }
-        button:hover {
+        a.btn:hover {
             background-color: #2563eb;
-        }
-        #status {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #334155;
-            border-radius: 6px;
-            font-size: 14px;
-            display: none;
         }
     </style>
 </head>
@@ -59,48 +46,8 @@
 
     <div class="container">
         <h1>Панель сбора данных</h1>
-        <div class="btn-group">
-            <button onclick="downloadReport('day')">Скачать отчет за день (CSV)</button>
-            <button onclick="downloadReport('hour')">Скачать отчет за час (CSV)</button>
-        </div>
-        <div id="status">Генерация отчета...</div>
+        <a href="/api/download-report" class="btn">Скачать сводный отчет (Excel)</a>
     </div>
-
-    <script>
-        function downloadReport(actionType) {
-            const statusDiv = document.getElementById('status');
-            statusDiv.style.display = 'block';
-            statusDiv.innerText = actionType === 'day' 
-                ? 'Запрос отчета за весь день...' 
-                : 'Запрос отчета за последний час...';
-
-            fetch('/api/download-report', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ action: actionType })
-            })
-            .then(response => {
-                if (!response.ok) throw new Error('Телефон еще не передал данные!');
-                return response.blob();
-            })
-            .then(blob => {
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `Call_Report_${actionType}.csv`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                statusDiv.innerText = 'Отчет успешно скачан!';
-            })
-            .catch(error => {
-                statusDiv.innerText = 'Ошибка: телефон еще не отправил данные.';
-                console.error(error);
-            });
-        }
-    </script>
 
 </body>
 </html>
