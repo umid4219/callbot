@@ -41,10 +41,10 @@ def download_report():
         
         output_xlsx_path = os.path.join(UPLOAD_FOLDER, "Summary_Call_Report.xlsx")
         
-        # Интервал за последние 48 часов
-        now = datetime.now()
-        start_time = now - timedelta(hours=48)
-        print(f"Ищем звонки за последние 48 часов (начиная с {start_time})")
+        # Получаем сегодняшнюю и вчерашнюю дату в виде строк 'YYYY-MM-DD'
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        yesterday_str = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        print(f"Ищем звонки за {yesterday_str} и {today_str}")
         
         summary_list = []
         all_details_df = pd.DataFrame()
@@ -62,17 +62,24 @@ def download_report():
                     df = pd.read_csv(file_path, sep=None, engine='python')
                 
                 date_col = None
-                for col in ['Дата и время', 'Date', 'date', 'time']:
+                for col in ['Date', 'date', 'Дата и время', 'time']:
                     if col in df.columns:
                         date_col = col
                         break
                 
                 if date_col:
-                    df['ParsedDate'] = pd.to_datetime(df[date_col], errors='coerce')
-                    filtered_df = df[(df['ParsedDate'] >= start_time) & (df['ParsedDate'] <= now)]
+                    # Превращаем колонку в текст и берем первые 10 символов (формат YYYY-MM-DD)
+                    df['DateStr'] = df[date_col].astype(str).str.strip().str.slice(0, 10)
+                    
+                    # Оставляем только те строки, где дата равна сегодня ИЛИ вчера
+                    filtered_df = df[(df['DateStr'] == today_str) | (df['DateStr'] == yesterday_str)]
+                    
                     if not filtered_df.empty:
                         df = filtered_df
-                    df = df.drop(columns=['ParsedDate'], errors='ignore')
+                    else:
+                        df = df.iloc[0:0]
+                        
+                    df = df.drop(columns=['DateStr'], errors='ignore')
 
                 if df.empty:
                     continue
