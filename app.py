@@ -21,7 +21,6 @@ def upload_report():
     if file.filename == '':
         return jsonify({"status": "error", "message": "Имя файла пустое"}), 400
     
-    # Сохраняем индивидуальный файл отчета (например, Call_Report_Алексей.csv)
     filename = secure_filename_custom(file.filename)
     filepath = os.path.join(UPLOAD_FOLDER, filename)
     
@@ -32,7 +31,6 @@ def upload_report():
 
 @app.route('/api/download-report', methods=['POST'])
 def download_report():
-    # Ищем абсолютно все файлы отчетов от телефонов в папке /tmp
     search_path = os.path.join(UPLOAD_FOLDER, "Call_Report_*.csv")
     csv_files = glob.glob(search_path)
     
@@ -41,29 +39,28 @@ def download_report():
     
     output_xlsx_path = os.path.join(UPLOAD_FOLDER, "Summary_Call_Report.xlsx")
     
-    # Создаем красивый многостраничный Excel файл
     with pd.ExcelWriter(output_xlsx_path, engine='openpyxl') as writer:
         summary_list = []
         all_details_df = pd.DataFrame()
 
         for file_path in csv_files:
             base_name = os.path.basename(file_path)
-            # Достаем имя сотрудника из названия файла
             employee_name = base_name.replace("Call_Report_", "").replace(".csv", "").replace("_", " ")
             
             try:
-                df = pd.read_csv(file_path)
+                df = pd.read_csv(file_path, sep=',')
                 if df.empty:
                     continue
                 
-                # Вставляем колонку с именем сотрудника на первое место
+                if len(df.columns) == 1:
+                    df = pd.read_csv(file_path, sep=None, engine='python')
+                
                 df.insert(0, 'Сотрудник', employee_name)
                 
-                # Считаем статистику для сводной таблицы
                 total_calls = len(df)
-                incoming = len(df[df['Type'] == 'Входящий'])
-                outgoing = len(df[df['Type'] == 'Исходящий'])
-                missed = len(df[df['Type'] == 'Пропущенный'])
+                incoming = len(df[df['Type'].astype(str).str.contains('Входящий|Incoming', case=False, na=False)])
+                outgoing = len(df[df['Type'].astype(str).str.contains('Исходящий|Outgoing', case=False, na=False)])
+                missed = len(df[df['Type'].astype(str).str.contains('Пропущенный|Missed', case=False, na=False)])
                 
                 summary_list.append({
                     'Сотрудник': employee_name,
@@ -77,14 +74,14 @@ def download_report():
             except Exception as e:
                 print(f"Ошибка чтения файла {file_path}: {e}")
 
-        # 1. Лист со сводкой по сотрудникам
         if summary_list:
             summary_df = pd.DataFrame(summary_list)
             summary_df.to_excel(writer, sheet_name='Сводка', index=False)
 
-        # 2. Лист с подробным списком всех звонков
         if not all_details_df.empty:
-            all_details_df.columns = ['Сотрудник', 'Номер телефона', 'Тип вызова', 'Дата и время', 'Длительность (сек)']
+            cols = ['Сотрудник', 'Номер телефона', 'Тип вызова', 'Дата и время', 'Длительность (сек)']
+            if len(all_details_df.columns) == len(cols):
+                all_details_df.columns = cols
             all_details_df.to_excel(writer, sheet_name='Детализация звонков', index=False)
 
     return send_file(
