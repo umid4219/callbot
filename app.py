@@ -23,7 +23,10 @@ def upload_report():
     
     filename = f"Call_Report_{action}.csv"
     filepath = os.path.join(UPLOAD_FOLDER, filename)
+    
+    # Сохраняем файл, который прислал телефон
     file.save(filepath)
+    print(f"Успешно сохранен файл: {filepath}")
     
     return jsonify({"status": "success", "message": "Отчет успешно загружен с телефона!"})
 
