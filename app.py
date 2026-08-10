@@ -7,20 +7,26 @@ app = Flask(__name__)
 def index():
     return render_template('index.html')
 
-@app.route('/api/collect', methods=['POST'])
-def collect_data():
-    data = request.json
-    action = data.get('action')
+@app.route('/api/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({"status": "error", "message": "Файл не найден в запросе"})
     
-    # Здесь можно прописать логику сбора данных (например, обращение к телефонам или базе)
-    if action == 'day':
-        message = "Выполнен сбор данных за весь день. Всё успешно выгружено!"
-    elif action == 'hour':
-        message = "Выполнен сбор данных за последний час. Всё успешно выгружено!"
-    else:
-        message = "Неизвестное действие."
+    file = request.files['file']
+    action = request.form.get('action') # 'day' или 'hour'
+    
+    if file.filename == '':
+        return jsonify({"status": "error", "message": "Файл не выбран"})
+    
+    if file:
+        # Здесь можно сохранить файл или сразу прочитать его через pandas / openpyxl
+        filename = file.filename
         
-    return jsonify({"status": "success", "message": message})
+        # --- ТВОЯ ЛОГИКА ОБРАБОТКИ EXCEL ---
+        # Пример: файл получен, дальше можно вытаскивать ФИО и ПИНФЛ
+        
+        message = f"Файл '{filename}' успешно получен для режима '{action}'! Данные обработаны."
+        return jsonify({"status": "success", "message": message})
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
