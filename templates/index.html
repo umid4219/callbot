@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Панель управления звонками</title>
+    <title>Панель управления Excel</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -21,23 +21,37 @@
             border-radius: 12px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
             text-align: center;
-            width: 400px;
+            width: 420px;
         }
         h1 {
             font-size: 22px;
             margin-bottom: 20px;
         }
-        .btn-group {
+        .form-group {
             display: flex;
             flex-direction: column;
             gap: 15px;
+            align-items: stretch;
+        }
+        input[type="file"] {
+            background-color: #334155;
+            color: #f8fafc;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #475569;
+            cursor: pointer;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
         }
         button {
+            flex: 1;
             background-color: #3b82f6;
             color: white;
             border: none;
-            padding: 12px 20px;
-            font-size: 16px;
+            padding: 12px;
+            font-size: 14px;
             border-radius: 8px;
             cursor: pointer;
             transition: background 0.2s;
@@ -52,32 +66,45 @@
             border-radius: 6px;
             font-size: 14px;
             display: none;
+            word-break: break-all;
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>Панель сбора данных</h1>
-        <div class="btn-group">
-            <button onclick="sendAction('day')">Собрать за весь день</button>
-            <button onclick="sendAction('hour')">Собрать за последний час</button>
+        <h1>Загрузка Excel</h1>
+        <div class="form-group">
+            <input type="file" id="excelFile" accept=".xlsx, .xls">
+            <div class="btn-group">
+                <button onclick="sendData('day')">За весь день</button>
+                <button onclick="sendData('hour')">За час</button>
+            </div>
         </div>
         <div id="result"></div>
     </div>
 
     <script>
-        function sendAction(actionType) {
+        function sendData(actionType) {
+            const fileInput = document.getElementById('excelFile');
             const resultDiv = document.getElementById('result');
-            resultDiv.style.display = 'block';
-            resultDiv.innerText = 'Запрос отправлен... Ждем выгрузку.';
 
-            fetch('/api/collect', {
+            if (fileInput.files.length === 0) {
+                resultDiv.style.display = 'block';
+                resultDiv.innerText = 'Пожалуйста, выберите Excel-файл!';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('action', actionType);
+
+            resultDiv.style.display = 'block';
+            resultDiv.innerText = 'Отправка и обработка файла...';
+
+            fetch('/api/upload', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ action: actionType })
+                body: formData
             })
             .then(response => response.json())
             .then(data => {
