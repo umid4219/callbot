@@ -50,14 +50,44 @@
         .btn:hover {
             opacity: 0.9;
         }
+        /* Скрываем контент по умолчанию, пока пароль не верен */
+        #protected-content {
+            display: none;
+        }
     </style>
 </head>
 <body>
+
     <div class="container">
-        <h2>Панель отчетов по звонкам</h2>
-        <p>Скачайте сводный Excel-отчет по всем сотрудникам за последние 48 часов.</p>
-        
-        <a href="/api/download-report" class="btn">Скачать отчет</a>
+        <!-- Ошибка, если пароль неверный -->
+        <div id="error-message" style="color: red; font-weight: bold; font-size: 16px;">
+            🔒 Доступ ограничен. Требуется пароль.
+        </div>
+
+        <!-- Основной контент страницы -->
+        <div id="protected-content">
+            <h2>Панель отчетов по звонкам</h2>
+            <p>Скачайте сводный Excel-отчет по всем сотрудникам за последние 48 часов.</p>
+            <a href="/api/download-report" class="btn">Скачать отчет</a>
+        </div>
     </div>
+
+    <script>
+        // Укажите ваш пароль здесь
+        const CORRECT_PASSWORD = "995764219Ur"; 
+
+        // Запрашиваем пароль при загрузке страницы
+        const userPassword = prompt("Введите пароль для доступа к странице:");
+
+        if (userPassword === CORRECT_PASSWORD) {
+            // Если пароль правильный — показываем контент и убираем сообщение об ошибке
+            document.getElementById("protected-content").style.display = "block";
+            document.getElementById("error-message").style.display = "none";
+        } else {
+            // Если пароль неверный или нажали отмену
+            alert("Неверный пароль!");
+        }
+    </script>
+
 </body>
 </html>
