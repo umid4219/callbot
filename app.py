@@ -9,7 +9,6 @@ app = FastAPI()
 
 DATA_FILE = "call_logs.csv"
 
-# Создаем файл с красивыми заголовками для колонок в Excel
 if not os.path.exists(DATA_FILE):
     with open(DATA_FILE, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
@@ -22,7 +21,6 @@ async def receive_log(request: Request):
     except Exception:
         data = {}
     
-    # Извлекаем поля, которые присылает приложение
     row = [
         data.get('device_name', data.get('phone_name', 'Unknown')),
         data.get('phone_number', 'Unknown'),
@@ -33,7 +31,6 @@ async def receive_log(request: Request):
         datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ]
     
-    # Записываем строку в CSV
     with open(DATA_FILE, 'a', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerow(row)
@@ -55,8 +52,8 @@ async def download_report():
 def read_root():
     return {"message": "Call Logger Server is running and ready!"}
 
-# Эта часть гарантирует, что Render успешно запустит сервер без падений
+# Автоматический запуск без использования консольных команд uvicorn
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
+    uvicorn.run("app:app", host="0.0.0.0", port=port)
