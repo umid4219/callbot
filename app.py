@@ -4,35 +4,36 @@ import pandas as pd
 import os
 from datetime import datetime
 import csv
-import json
 
 app = FastAPI()
 
 DATA_FILE = "call_logs.csv"
 
-# Создаем файл с базовыми заголовками
+# Создаем файл с красивыми заголовками для колонок в Excel
 if not os.path.exists(DATA_FILE):
     with open(DATA_FILE, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        writer.writerow(['Raw Data', 'Received At'])
+        writer.writerow(['Device Name', 'Phone Number', 'Call Type', 'Contact Number', 'Date & Time', 'Duration (sec)', 'Received At'])
 
 @app.post("/log")
 async def receive_log(request: Request):
     try:
-        # Пытаемся прочитать как JSON
-        body = await request.json()
-        data_str = json.dumps(body, ensure_ascii=False)
-    except:
-        # Если это не JSON, читаем как текст
-        body = await request.body()
-        data_str = body.decode('utf-8', errors='ignore')
+        data = await request.json()
+    except Exception:
+        data = {}
     
-    # Сохраняем «сырые» данные, чтобы вы точно их не потеряли
+    # Извлекаем поля, которые присылает приложение
     row = [
-        data_str,
+        data.get('device_name', data.get('phone_name', 'Unknown')),
+        data.get('phone_number', 'Unknown'),
+        data.get('call_type', 'Unknown'),
+        data.get('contact_number', data.get('number', 'Unknown')),
+        data.get('date_time', data.get('timestamp', 'Unknown')),
+        data.get('duration', 0),
         datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ]
     
+    # Записываем строку в CSV
     with open(DATA_FILE, 'a', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerow(row)
@@ -52,4 +53,10 @@ async def download_report():
 
 @app.get("/")
 def read_root():
-    return {"message": "Server is running"}
+    return {"message": "Call Logger Server is running and ready!"}
+
+# Эта часть гарантирует, что Render успешно запустит сервер без падений
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
