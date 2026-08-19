@@ -4,30 +4,32 @@ import pandas as pd
 import os
 from datetime import datetime
 import csv
+import json
 
 app = FastAPI()
 
-# Имя файла с данными
 DATA_FILE = "call_logs.csv"
 
-# Создаем файл с заголовками, если он еще не существует
+# Создаем файл с базовыми заголовками
 if not os.path.exists(DATA_FILE):
     with open(DATA_FILE, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        writer.writerow(['Device Name', 'Phone Number', 'Call Type', 'Contact Number', 'Date & Time', 'Duration (sec)', 'Received At'])
+        writer.writerow(['Raw Data', 'Received At'])
 
 @app.post("/log")
 async def receive_log(request: Request):
-    data = await request.json()
+    try:
+        # Пытаемся прочитать как JSON
+        body = await request.json()
+        data_str = json.dumps(body, ensure_ascii=False)
+    except:
+        # Если это не JSON, читаем как текст
+        body = await request.body()
+        data_str = body.decode('utf-8', errors='ignore')
     
-    # Извлекаем данные из JSON (названия полей должны совпадать с тем, что шлет приложение)
+    # Сохраняем «сырые» данные, чтобы вы точно их не потеряли
     row = [
-        data.get('device_name', 'Unknown'),
-        data.get('phone_number', 'Unknown'),
-        data.get('call_type', 'Unknown'),
-        data.get('contact_number', 'Unknown'),
-        data.get('date_time', 'Unknown'),
-        data.get('duration', 0),
+        data_str,
         datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ]
     
@@ -42,14 +44,12 @@ async def download_report():
     if not os.path.exists(DATA_FILE):
         return {"error": "No data found"}
     
-    # Читаем CSV и конвертируем в Excel
     df = pd.read_csv(DATA_FILE)
     output_filename = "Call_Report.xlsx"
     df.to_excel(output_filename, index=False)
     
-    # Отдаем файл для скачивания
     return FileResponse(output_filename, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', filename='Call_Report.xlsx')
 
 @app.get("/")
 def read_root():
-    return {"message": "Call Logger Server is running. Use /download-report to get the Excel file."}
+    return {"message": "Server is running"}
